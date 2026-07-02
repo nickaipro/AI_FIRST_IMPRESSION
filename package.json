@@ -16,11 +16,13 @@
     "@types/react-dom": "^19.2.3",
     "next": "^16.2.9",
     "openai": "^6.45.0",
-    "playwright": "^1.61.1",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^6.0.3",
     "zod": "^4.4.3"
+  },
+  "optionalDependencies": {
+    "playwright": "^1.61.1"
   },
   "devDependencies": {
     "autoprefixer": "^10.5.2",

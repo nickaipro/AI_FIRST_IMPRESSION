@@ -1,6 +1,5 @@
 import type { AnalysisResult, WebsiteData } from "@/types";
 import { extractWithFirecrawl } from "./firecrawl";
-import { extractWithPlaywright } from "./playwright";
 import { analyzeWithAI } from "./openrouter";
 import { getMockAnalysis } from "./mock";
 
@@ -36,11 +35,13 @@ export async function performAnalysis(
   } catch (error) {
     console.log("⚠️ Firecrawl failed:", error instanceof Error ? error.message : String(error));
 
-    // Intentar con Playwright solo si estamos en desarrollo o si Firecrawl falló
-    // En producción (Vercel), Playwright probablemente no funcionará sin configuración especial
+    // Intentar con Playwright solo si estamos en desarrollo
+    // En producción (Vercel), Playwright no está disponible sin configuración especial
     if (process.env.NODE_ENV === 'development') {
       try {
-        console.log("Attempting extraction with Playwright...");
+        console.log("Attempting extraction with Playwright (dev only)...");
+        // Importación dinámica para evitar que Playwright se empaquete en producción
+        const { extractWithPlaywright } = await import("./playwright");
         const playwrightData = await extractWithPlaywright(url);
         Object.assign(websiteData, playwrightData);
         extractionSuccess = true;
@@ -49,7 +50,7 @@ export async function performAnalysis(
         console.error("❌ Playwright also failed:", playwrightError);
       }
     } else {
-      console.log("⚠️ Skipping Playwright in production environment");
+      console.log("⚠️ Skipping Playwright in production environment (Vercel)");
     }
   }
 
