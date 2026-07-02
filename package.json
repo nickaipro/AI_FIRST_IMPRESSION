@@ -11,18 +11,18 @@
   "description": "AI-powered first impression analysis for websites",
   "dependencies": {
     "@mendable/firecrawl-js": "^1.21.1",
+    "@react-pdf/renderer": "^4.5.1",
     "@types/node": "^26.0.1",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.38.0",
     "next": "^16.2.9",
     "openai": "^6.45.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "typescript": "^6.0.3",
     "zod": "^4.4.3"
-  },
-  "optionalDependencies": {
-    "playwright": "^1.61.1"
   },
   "devDependencies": {
     "autoprefixer": "^10.5.2",

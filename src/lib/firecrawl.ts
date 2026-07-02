@@ -17,7 +17,7 @@ export async function extractWithFirecrawl(
 
     const result = await Promise.race([
       app.scrapeUrl(url, {
-        formats: ["markdown", "html"],
+        formats: ["markdown", "html", "screenshot"],
       }),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Firecrawl timeout")), FIRECRAWL_TIMEOUT)
@@ -47,12 +47,22 @@ export async function extractWithFirecrawl(
       headings.h3 = h3Matches.map((h: string) => h.replace(/<[^>]*>/g, "").trim());
     }
 
+    // Extraer screenshot si está disponible
+    const screenshot = data.screenshot || undefined;
+    
+    if (screenshot) {
+      console.log("📸 Screenshot captured successfully");
+    } else {
+      console.log("⚠️ No screenshot available from Firecrawl");
+    }
+
     return {
       title: data.metadata?.title || data.title || "",
       description: data.metadata?.description || data.description || "",
       mainContent: data.markdown || data.content || "",
       headings,
       importantLinks: data.metadata?.links || [],
+      screenshot,
     };
   } catch (error) {
     console.error("Firecrawl extraction error:", error);

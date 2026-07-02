@@ -4,6 +4,7 @@ import { getGradeTier, RUBRIC_DIMENSIONS } from "./rubric";
 
 const DEFAULT_MODEL = "openai/gpt-4o-mini";
 const FALLBACK_MODEL = "openrouter/auto";
+const DEFAULT_VISION_MODEL = "anthropic/claude-3.5-sonnet"; // Modelo con visión por defecto
 
 export async function analyzeWithAI(
   websiteData: WebsiteData,
@@ -17,12 +18,46 @@ export async function analyzeWithAI(
   }
 
   const primaryModel = process.env.OPENROUTER_MODEL || DEFAULT_MODEL;
+  const visionModel = process.env.OPENROUTER_VISION_MODEL || DEFAULT_VISION_MODEL;
+  const hasScreenshot = !!websiteData.screenshot;
+  const modelToUse = hasScreenshot ? visionModel : primaryModel;
+  
+  console.log(`🤖 Using model: ${modelToUse}${hasScreenshot ? ' (with vision)' : ' (text-only)'}`);
+
 
   const systemPrompt = `Eres AI First Impression, un auditor experto en UX, copywriting, psicología cognitiva, CRO y claridad web.
 
 Tu trabajo es evaluar una página web desde la perspectiva del público objetivo indicado por el usuario.
 
 IMPORTANTE: No debes afirmar que realmente sientes como humano. Debes hacer una simulación razonada basada en evidencia visible, contenido extraído y buenas prácticas de UX/CRO.
+
+${hasScreenshot ? `
+🎨 ANÁLISIS VISUAL DISPONIBLE:
+Se te proporcionará un SCREENSHOT de la página web. Analiza TAMBIÉN:
+- Jerarquía visual real (tamaño, peso, posición de elementos)
+- Uso del espacio en blanco y densidad visual
+- Contraste de colores y legibilidad
+- Diseño responsive y adaptación a diferentes pantallas
+- Coherencia estética y profesionalismo visual
+- Layout y organización espacial de secciones
+- Elementos visuales que generan confianza o desconfianza
+
+Combina el análisis visual (screenshot) con el análisis textual (contenido) para una evaluación completa.
+` : `
+⚠️ ANÁLISIS SOLO-TEXTO:
+NO se proporcionó screenshot. Tu análisis está limitado al contenido textual extraído.
+NO evalúes aspectos visuales que no puedes ver (colores, tipografía, espaciado, layout).
+Enfócate en: claridad del mensaje, estructura del contenido, copy, jerarquía de información textual.
+`}
+
+⚠️ REGLA CRÍTICA ANTI-ALUCINACIÓN:
+Basa tu análisis ÚNICAMENTE en el CONTENIDO PROPORCIONADO abajo. NO uses conocimiento previo sobre la marca ni asumas NADA que no esté explícitamente en el contenido.
+
+Si un elemento (CTA, testimonios, precios, logos de clientes, métodos de pago, etc.) NO aparece en el contenido proporcionado, NO afirmes que la página no lo tiene. En su lugar, indica en tu análisis: "No se pudo evaluar [elemento] por contenido insuficiente en la extracción".
+
+DISTINGUE SIEMPRE entre:
+- "Ausente en la página" → Solo si el contenido extraído es completo y el elemento claramente no está
+- "No evaluable por contenido parcial" → Cuando el contenido extraído puede ser incompleto
 
 PRINCIPIOS DE EVALUACIÓN:
 
@@ -189,6 +224,35 @@ Devuelve el análisis en este formato JSON exacto:
     
     console.log("Calling OpenRouter with model:", model);
     console.log("HTTP-Referer:", referer);
+    console.log("Has screenshot:", hasScreenshot);
+
+    // Construir el mensaje del usuario según si hay screenshot o no
+    let userMessage: any;
+    
+    if (hasScreenshot && websiteData.screenshot) {
+      // Mensaje multimodal con imagen
+      userMessage = {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: userPrompt,
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: websiteData.screenshot,
+            },
+          },
+        ],
+      };
+    } else {
+      // Mensaje solo texto
+      userMessage = {
+        role: "user",
+        content: userPrompt,
+      };
+    }
 
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
@@ -202,7 +266,7 @@ Devuelve el análisis en este formato JSON exacto:
         model: model,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+          userMessage,
         ],
         temperature: 0.3,
         response_format: { type: "json_object" },
@@ -228,7 +292,7 @@ Devuelve el análisis en este formato JSON exacto:
       console.log("✅ Successfully parsed AI response");
       
       // Validar y calibrar la respuesta
-      const validated = validateAndCalibrateResponse(result, websiteData);
+      const validated = validateAndCalibrateResponse(result, websiteData, hasScreenshot);
       return validated;
     } catch (parseError) {
       console.error("❌ Failed to parse AI response:", content.substring(0, 200));
@@ -237,12 +301,22 @@ Devuelve el análisis en este formato JSON exacto:
   }
 
   try {
-    console.log(`Attempting analysis with model: ${primaryModel}`);
-    return await callOpenRouter(primaryModel);
+    console.log(`Attempting analysis with model: ${modelToUse}`);
+    return await callOpenRouter(modelToUse);
   } catch (primaryError) {
-    console.error(`Primary model (${primaryModel}) failed:`, primaryError);
+    console.error(`Primary model (${modelToUse}) failed:`, primaryError);
     
-    if (primaryModel === FALLBACK_MODEL) {
+    // Si falla el modelo con visión, intentar con modelo de texto solo
+    if (hasScreenshot && modelToUse !== primaryModel) {
+      console.log(`🔄 Vision model failed, falling back to text-only model: ${primaryModel}`);
+      try {
+        return await callOpenRouter(primaryModel);
+      } catch (fallbackError) {
+        console.error(`Text-only fallback also failed:`, fallbackError);
+      }
+    }
+    
+    if (modelToUse === FALLBACK_MODEL) {
       throw new Error(
         "No se pudo generar el análisis con OpenRouter. Revisa tu API key, saldo o modelo configurado."
       );
@@ -260,7 +334,7 @@ Devuelve el análisis en este formato JSON exacto:
   }
 }
 
-function validateAndCalibrateResponse(rawResult: any, websiteData: WebsiteData): AnalysisResult {
+function validateAndCalibrateResponse(rawResult: any, websiteData: WebsiteData, visualAnalysisUsed: boolean = false): AnalysisResult {
   // Validar y limpiar dimension scores
   let dimensionScores = validateDimensionScores(rawResult.dimensionScores || {});
   
@@ -294,7 +368,8 @@ function validateAndCalibrateResponse(rawResult: any, websiteData: WebsiteData):
       gradeTier: getGradeTier(calibration.totalScore),
       understandingTimeSeconds: rawResult.evaluationSummary?.understandingTimeSeconds || 5,
       executiveSummary: rawResult.evaluationSummary?.executiveSummary || "",
-      calibrationNote: calibration.calibrationNote
+      calibrationNote: calibration.calibrationNote,
+      visualAnalysisUsed
     },
     pageContext: rawResult.pageContext || {
       url: websiteData.url,

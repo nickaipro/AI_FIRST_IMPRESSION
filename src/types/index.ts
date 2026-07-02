@@ -27,6 +27,7 @@ export interface EvaluationSummary {
   understandingTimeSeconds: number;
   executiveSummary: string;
   calibrationNote?: string;
+  visualAnalysisUsed?: boolean;
 }
 
 export interface PageContext {

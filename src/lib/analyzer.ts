@@ -2,6 +2,7 @@ import type { AnalysisResult, WebsiteData } from "@/types";
 import { extractWithFirecrawl } from "./firecrawl";
 import { analyzeWithAI } from "./openrouter";
 import { getMockAnalysis } from "./mock";
+import { getCachedAnalysis, setCachedAnalysis } from "./cache";
 
 export async function performAnalysis(
   url: string,
@@ -9,6 +10,13 @@ export async function performAnalysis(
   pageGoal?: string
 ): Promise<AnalysisResult> {
   console.log("Starting performAnalysis for:", url);
+  
+  // Verificar caché primero
+  const cachedResult = await getCachedAnalysis(url, targetAudience, pageGoal);
+  if (cachedResult) {
+    console.log("📦 Returning cached analysis (saves API costs)");
+    return cachedResult;
+  }
   
   const websiteData: WebsiteData = {
     url,
@@ -33,25 +41,8 @@ export async function performAnalysis(
     extractionSuccess = true;
     console.log("✅ Successfully extracted data with Firecrawl");
   } catch (error) {
-    console.log("⚠️ Firecrawl failed:", error instanceof Error ? error.message : String(error));
-
-    // Intentar con Playwright solo si estamos en desarrollo
-    // En producción (Vercel), Playwright no está disponible sin configuración especial
-    if (process.env.NODE_ENV === 'development') {
-      try {
-        console.log("Attempting extraction with Playwright (dev only)...");
-        // Importación dinámica para evitar que Playwright se empaquete en producción
-        const { extractWithPlaywright } = await import("./playwright");
-        const playwrightData = await extractWithPlaywright(url);
-        Object.assign(websiteData, playwrightData);
-        extractionSuccess = true;
-        console.log("✅ Successfully extracted data with Playwright");
-      } catch (playwrightError) {
-        console.error("❌ Playwright also failed:", playwrightError);
-      }
-    } else {
-      console.log("⚠️ Skipping Playwright in production environment (Vercel)");
-    }
+    console.error("❌ Firecrawl failed:", error instanceof Error ? error.message : String(error));
+    // Ya no hay fallback a Playwright - solo Firecrawl en producción
   }
 
   if (!extractionSuccess) {
@@ -61,23 +52,44 @@ export async function performAnalysis(
     );
   }
 
-  if (!websiteData.title && !websiteData.mainContent) {
+  // Validar contenido mínimo para evitar análisis con datos insuficientes
+  const combinedContent = `${websiteData.title || ""} ${websiteData.mainContent || ""}`.trim();
+  const contentLength = combinedContent.length;
+  
+  console.log(`📊 Content extracted - Length: ${contentLength} chars`);
+  console.log(`📄 Content preview (first 200 chars): ${combinedContent.slice(0, 200)}...`);
+
+  if (contentLength < 300) {
     throw new Error(
-      "El contenido extraído está vacío. El sitio web puede estar bloqueando el acceso automatizado."
+      "No pudimos leer suficiente contenido de esta web. Puede estar bloqueando el acceso automatizado " +
+      "o requerir JavaScript para cargar el contenido. Intenta con otra URL."
     );
   }
 
   const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;
+  const isDevelopment = process.env.NODE_ENV !== 'production';
 
+  // Modo mock SOLO en desarrollo cuando falta API key
   if (!hasOpenRouterKey) {
-    console.log("⚠️ No OpenRouter API key found, using mock analysis");
-    return getMockAnalysis(url, targetAudience, pageGoal);
+    if (isDevelopment) {
+      console.log("⚠️ No OpenRouter API key found in development, using mock analysis");
+      return getMockAnalysis(url, targetAudience, pageGoal);
+    } else {
+      // En producción, si falta API key es un error fatal
+      throw new Error(
+        "El análisis no está disponible en este momento. Configuración del servidor incompleta."
+      );
+    }
   }
 
   try {
     console.log("Starting AI analysis...");
     const analysis = await analyzeWithAI(websiteData, targetAudience, pageGoal);
     console.log("✅ AI analysis completed");
+    
+    // Guardar en caché para futuras consultas
+    await setCachedAnalysis(url, targetAudience, analysis, pageGoal);
+    
     return analysis;
   } catch (error) {
     console.error("❌ AI analysis failed:", error);

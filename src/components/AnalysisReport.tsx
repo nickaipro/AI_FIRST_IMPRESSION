@@ -1,7 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import type { AnalysisResult } from "@/types";
 import { getGradeTierColor } from "@/lib/rubric";
+import { pdf } from "@react-pdf/renderer";
+import { PDFReport } from "./PDFReport";
 
 interface AnalysisReportProps {
   result: AnalysisResult;
@@ -10,6 +13,7 @@ interface AnalysisReportProps {
 
 export default function AnalysisReport({ result, onReset }: AnalysisReportProps) {
   const { evaluationSummary, pageContext, dimensionScores, findings, personaInsights, priorityActions, heroRewrite, reasonsToLeave, conversionOpportunities } = result;
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   
   const getScoreGradientClass = (score: number) => {
     if (score >= 90) return "bg-gradient-to-br from-emerald-500 to-emerald-600";
@@ -70,6 +74,45 @@ CTA: ${heroRewrite.cta}`;
 
     navigator.clipboard.writeText(text);
     alert("¡Informe copiado al portapapeles!");
+  };
+
+  const downloadPDF = async () => {
+    setIsGeneratingPDF(true);
+    try {
+      // Extraer dominio para el nombre del archivo
+      const domain = pageContext.url.replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
+      const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const filename = `informe-${domain}-${date}.pdf`;
+      
+      // Fecha formateada para mostrar en el PDF
+      const generatedDate = new Date().toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      // Generar el PDF
+      const blob = await pdf(
+        <PDFReport result={result} generatedDate={generatedDate} />
+      ).toBlob();
+
+      // Descargar
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      alert('No se pudo generar el PDF. Por favor, intenta de nuevo.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   return (
@@ -303,7 +346,24 @@ CTA: ${heroRewrite.cta}`;
           onClick={copyReport}
           className="flex-1 px-6 py-4 bg-primary-600 text-white font-bold rounded-xl hover:bg-primary-700 transition-colors shadow-lg hover:shadow-xl"
         >
-          Copiar informe
+          📋 Copiar informe
+        </button>
+        <button
+          onClick={downloadPDF}
+          disabled={isGeneratingPDF}
+          className="flex-1 px-6 py-4 bg-gradient-to-r from-primary-600 to-primary-700 text-white font-bold rounded-xl hover:from-primary-700 hover:to-primary-800 transition-all shadow-lg hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isGeneratingPDF ? (
+            <span className="flex items-center justify-center gap-2">
+              <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
+              Generando PDF...
+            </span>
+          ) : (
+            "📄 Descargar PDF"
+          )}
         </button>
         <button
           onClick={onReset}
