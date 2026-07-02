@@ -32,6 +32,22 @@ export default function AnalysisForm({ onAnalysisComplete }: AnalysisFormProps) 
         }),
       });
 
+      // Verificar si la respuesta HTTP fue exitosa
+      if (!response.ok) {
+        // Intentar leer el mensaje de error del servidor
+        let errorMessage = "No pudimos analizar tu web ahora mismo. Intenta de nuevo en un momento.";
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMessage = errorData.error;
+          }
+        } catch {
+          // Si no se puede parsear el JSON, usar el mensaje por defecto
+          errorMessage = `Error del servidor (${response.status}): ${response.statusText}`;
+        }
+        throw new Error(errorMessage);
+      }
+
       const data = await response.json();
 
       if (!data.success) {
@@ -40,7 +56,12 @@ export default function AnalysisForm({ onAnalysisComplete }: AnalysisFormProps) 
 
       onAnalysisComplete(data.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Ocurrió un error inesperado");
+      console.error("Error durante el análisis:", err);
+      setError(
+        err instanceof Error 
+          ? err.message 
+          : "Ocurrió un error inesperado. Por favor, intenta nuevamente."
+      );
     } finally {
       setLoading(false);
     }

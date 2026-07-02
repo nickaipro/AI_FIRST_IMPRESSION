@@ -180,12 +180,22 @@ Devuelve el análisis en este formato JSON exacto:
 }`;
 
   async function callOpenRouter(model: string): Promise<AnalysisResult> {
+    // Obtener el referer correcto (Vercel URL en producción, localhost en desarrollo)
+    const referer = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}` 
+      : process.env.NEXT_PUBLIC_VERCEL_URL
+      ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`
+      : "http://localhost:3000";
+    
+    console.log("Calling OpenRouter with model:", model);
+    console.log("HTTP-Referer:", referer);
+
     const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "http://localhost:3000",
+        "HTTP-Referer": referer,
         "X-Title": "AI First Impression",
       },
       body: JSON.stringify({
@@ -201,6 +211,7 @@ Devuelve el análisis en este formato JSON exacto:
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`❌ OpenRouter returned ${response.status}:`, errorText);
       throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
     }
 
@@ -208,17 +219,20 @@ Devuelve el análisis en este formato JSON exacto:
     const content = data.choices?.[0]?.message?.content;
 
     if (!content) {
-      throw new Error("Empty response from AI");
+      console.error("❌ OpenRouter returned empty content:", data);
+      throw new Error("OpenRouter devolvió una respuesta vacía");
     }
 
     try {
       const result = JSON.parse(content);
+      console.log("✅ Successfully parsed AI response");
       
       // Validar y calibrar la respuesta
       const validated = validateAndCalibrateResponse(result, websiteData);
       return validated;
     } catch (parseError) {
-      throw new Error("Failed to parse AI response as JSON");
+      console.error("❌ Failed to parse AI response:", content.substring(0, 200));
+      throw new Error(`El modelo devolvió un formato inválido: ${parseError instanceof Error ? parseError.message : 'Error de parseo'}`);
     }
   }
 
