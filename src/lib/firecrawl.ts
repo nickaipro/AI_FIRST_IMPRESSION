@@ -17,7 +17,7 @@ export async function extractWithFirecrawl(
 
     const result = await Promise.race([
       app.scrapeUrl(url, {
-        formats: ["markdown", "html", "screenshot", "links"],
+        formats: ["markdown", "html", "screenshot"],
       }),
       new Promise((_, reject) =>
         setTimeout(() => reject(new Error("Firecrawl timeout")), FIRECRAWL_TIMEOUT)

@@ -137,44 +137,50 @@ export function getMockAnalysis(
         recommendation: "Integrar testimonios, métricas de impacto y logos de clientes de forma prominente."
       }
     ],
+    extractedElements: {
+      actualHeadline: "Soluciones empresariales para " + targetAudience,
+      actualCTAs: ["Comenzar", "Más información", "Contactar"],
+      actualValueProposition: "Ayudamos a empresas a optimizar sus procesos mediante tecnología innovadora.",
+      actualTrustElements: ["Certificación ISO", "Más de 500 clientes"],
+      keyVisualElements: ["Hero con gradiente azul", "Imagen de dashboard", "Iconos de características"]
+    },
     priorityActions: [
       {
         title: "Añadir testimonios o casos de éxito visibles",
         severity: "medium",
         impact: "high",
         difficulty: "easy",
-        explanation: "La prueba social es uno de los elementos más poderosos para aumentar conversión. Añadir 2-3 testimonios específicos con foto puede aumentar la confianza significativamente.",
-        exampleFix: "Añadir una sección antes o después del CTA con testimonios que incluyan nombre, foto, empresa y resultado específico logrado."
+        currentState: "La página no muestra testimonios, casos de éxito, ni logos de clientes en la sección hero ni antes del CTA principal.",
+        explanation: `Para ${targetAudience}, la prueba social es uno de los elementos más poderosos para aumentar conversión. Este público necesita validación de que otras empresas similares han tenido éxito con la solución.`,
+        exampleFix: "Añadir una sección justo después del hero con 2-3 testimonios específicos: 'Juan Pérez, CEO de TechCorp: Redujimos tiempos de respuesta en 40% en el primer mes' + foto + logo de empresa."
       },
       {
         title: "Hacer el CTA más específico y orientado a la acción",
         severity: "low",
         impact: "medium",
         difficulty: "easy",
-        explanation: "Un CTA específico genera más claridad sobre qué pasará al hacer clic, reduciendo fricción mental.",
-        exampleFix: "Cambiar de 'Comenzar' a 'Solicitar demo gratuita' o 'Empezar prueba de 14 días'."
+        currentState: "El CTA actual dice 'Comenzar' (genérico y vago, no comunica qué pasará después del clic).",
+        explanation: `Para ${targetAudience}, un CTA específico genera más claridad sobre qué pasará al hacer clic, reduciendo fricción mental y aumentando la tasa de conversión.`,
+        exampleFix: "Cambiar 'Comenzar' por 'Solicitar demo gratuita de 15 minutos' o 'Empezar prueba de 14 días sin tarjeta'."
       },
       {
         title: "Mejorar el subtítulo con beneficios concretos",
         severity: "low",
         impact: "medium",
         difficulty: "easy",
-        explanation: "Un subtítulo que especifique beneficios tangibles ayuda a la comprensión rápida y aumenta el interés.",
-        exampleFix: "Añadir métricas o resultados específicos: 'Ahorra 10 horas semanales en [tarea específica]'."
-      },
-      {
-        title: "Aumentar contraste visual del título principal",
-        severity: "optional",
-        impact: "low",
-        difficulty: "easy",
-        explanation: "Mejorar la jerarquía visual ayuda a que la propuesta principal destaque más al primer vistazo.",
-        exampleFix: "Aumentar el tamaño de fuente del H1 y usar un peso de fuente más bold."
+        currentState: "El subtítulo actual es 'Ayudamos a empresas a optimizar sus procesos' (genérico, no especifica cómo ni qué beneficio tangible aporta).",
+        explanation: `Para ${targetAudience}, un subtítulo que especifique beneficios tangibles y cuantificables ayuda a la comprensión rápida del valor y aumenta el interés.`,
+        exampleFix: "Cambiar por 'Automatiza tareas repetitivas y ahorra 10+ horas semanales con nuestro sistema de [funcionalidad específica]' con métricas reales."
       }
     ],
     heroRewrite: {
-      headline: `${targetAudience}: ${pageGoal || "Logra tus objetivos"} en la mitad del tiempo`,
-      subheadline: `Deja de perder horas en tareas manuales. Nuestra plataforma automatiza el trabajo pesado para que te enfoques en lo que realmente importa.`,
-      cta: pageGoal ? `Empezar ahora` : "Solicitar demo gratuita"
+      currentHeadline: "Soluciones empresariales para " + targetAudience,
+      currentSubheadline: "Ayudamos a empresas a optimizar sus procesos mediante tecnología innovadora",
+      currentCta: "Comenzar",
+      headline: `${targetAudience}: ${pageGoal || "Logra tus objetivos"} sin perder tiempo en tareas manuales`,
+      subheadline: `Automatiza tu flujo de trabajo y ahorra 10+ horas semanales. Más de 500 empresas ya confían en nuestra plataforma.`,
+      cta: pageGoal ? `${pageGoal.charAt(0).toUpperCase() + pageGoal.slice(1)} ahora` : "Solicitar demo gratuita",
+      whyBetter: `El headline actual ('Soluciones empresariales') es genérico y no comunica un beneficio claro ni conecta con ${targetAudience}. La nueva versión: (1) menciona al público objetivo explícitamente, (2) promete un resultado concreto (ahorrar tiempo), (3) especifica el mecanismo (automatización), y (4) añade prueba social (500 empresas) para generar confianza inmediata.`
     },
     reasonsToLeave: [
       {

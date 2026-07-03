@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { AnalysisResult } from "@/types";
 
 interface AnalysisFormProps {
@@ -13,6 +13,31 @@ export default function AnalysisForm({ onAnalysisComplete }: AnalysisFormProps) 
   const [pageGoal, setPageGoal] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showAudienceHint, setShowAudienceHint] = useState(false);
+  const [showGoalHint, setShowGoalHint] = useState(false);
+
+  // Detectar si el input es muy genérico y mostrar hint
+  useEffect(() => {
+    if (targetAudience.length > 0) {
+      const words = targetAudience.trim().split(/\s+/).filter(w => w.length > 2);
+      const isVague = words.length < 4 || 
+                      /^(personas?|gente|usuarios?|clientes?|todos?)$/i.test(targetAudience.trim());
+      setShowAudienceHint(isVague);
+    } else {
+      setShowAudienceHint(false);
+    }
+  }, [targetAudience]);
+
+  useEffect(() => {
+    if (pageGoal.length > 0) {
+      const words = pageGoal.trim().split(/\s+/).filter(w => w.length > 2);
+      const isVague = words.length < 3 || 
+                      /^(comprar|vender|contactar|suscribir)$/i.test(pageGoal.trim());
+      setShowGoalHint(isVague);
+    } else {
+      setShowGoalHint(false);
+    }
+  }, [pageGoal]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,9 +136,21 @@ export default function AnalysisForm({ onAnalysisComplete }: AnalysisFormProps) 
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-gray-900 placeholder-gray-400"
               disabled={loading}
             />
-            <p className="mt-2 text-xs text-gray-500">
-              ¿A quién está dirigido este sitio web?
-            </p>
+            {showAudienceHint ? (
+              <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-amber-800">
+                  💡 <strong>Consejo:</strong> Entre más específico seas, mejor será tu análisis. 
+                  <br />
+                  <span className="text-amber-700">
+                    Ejemplo: <em>"mujeres de 25-40 años que buscan calzado sostenible para uso diario"</em> en vez de <em>"personas que quieran zapatos"</em>
+                  </span>
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">
+                ¿A quién está dirigido este sitio web?
+              </p>
+            )}
           </div>
 
           <div>
@@ -132,9 +169,21 @@ export default function AnalysisForm({ onAnalysisComplete }: AnalysisFormProps) 
               className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 outline-none transition-all text-gray-900 placeholder-gray-400"
               disabled={loading}
             />
-            <p className="mt-2 text-xs text-gray-500">
-              ¿Qué deberían hacer los visitantes?
-            </p>
+            {showGoalHint ? (
+              <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-xs text-amber-800">
+                  💡 <strong>Consejo:</strong> Sé específico sobre qué deben hacer los visitantes. 
+                  <br />
+                  <span className="text-amber-700">
+                    Ejemplo: <em>"agendar una demo de 15 minutos con el equipo de ventas"</em> en vez de <em>"contactar"</em>
+                  </span>
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-xs text-gray-500">
+                ¿Qué deberían hacer los visitantes?
+              </p>
+            )}
           </div>
 
           {error && (

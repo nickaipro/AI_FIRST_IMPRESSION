@@ -33,34 +33,39 @@ export async function POST(request: NextRequest) {
   console.log("Firecrawl API key present:", !!process.env.FIRECRAWL_API_KEY);
   
   try {
-    // Rate limiting por IP
+    // Rate limiting por IP (fail-open si Upstash falla)
     if (ratelimit) {
-      const ip = request.headers.get("x-forwarded-for") || 
-                 request.headers.get("x-real-ip") || 
-                 "unknown";
-      
-      const { success, limit, remaining, reset } = await ratelimit.limit(ip);
-      
-      console.log(`🚦 Rate limit check for IP ${ip}: ${remaining}/${limit} remaining`);
-      
-      if (!success) {
-        const resetDate = new Date(reset);
-        const minutesUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / 60000);
+      try {
+        const ip = request.headers.get("x-forwarded-for") || 
+                   request.headers.get("x-real-ip") || 
+                   "unknown";
         
-        return NextResponse.json<AnalysisResponse>(
-          {
-            success: false,
-            error: `Has alcanzado el límite de análisis (${limit} cada 10 minutos). Intenta de nuevo en ${minutesUntilReset} minutos.`,
-          },
-          { 
-            status: 429,
-            headers: {
-              "X-RateLimit-Limit": limit.toString(),
-              "X-RateLimit-Remaining": remaining.toString(),
-              "X-RateLimit-Reset": reset.toString(),
+        const { success, limit, remaining, reset } = await ratelimit.limit(ip);
+        
+        console.log(`🚦 Rate limit check for IP ${ip}: ${remaining}/${limit} remaining`);
+        
+        if (!success) {
+          const resetDate = new Date(reset);
+          const minutesUntilReset = Math.ceil((resetDate.getTime() - Date.now()) / 60000);
+          
+          return NextResponse.json<AnalysisResponse>(
+            {
+              success: false,
+              error: `Has alcanzado el límite de análisis (${limit} cada 10 minutos). Intenta de nuevo en ${minutesUntilReset} minutos.`,
+            },
+            { 
+              status: 429,
+              headers: {
+                "X-RateLimit-Limit": limit.toString(),
+                "X-RateLimit-Remaining": remaining.toString(),
+                "X-RateLimit-Reset": reset.toString(),
+              }
             }
-          }
-        );
+          );
+        }
+      } catch (rateLimitError) {
+        // Fail-open: si Upstash falla, permitir el análisis
+        console.error("⚠️ Rate limit check failed, proceeding (fail-open):", rateLimitError);
       }
     }
   

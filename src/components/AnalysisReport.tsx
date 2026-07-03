@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
+import dynamic from "next/dynamic";
 import type { AnalysisResult } from "@/types";
 import { getGradeTierColor } from "@/lib/rubric";
-import { pdf } from "@react-pdf/renderer";
-import { PDFReport } from "./PDFReport";
+
+// Lazy-load del componente PDF (solo se carga cuando el usuario descarga)
+const PDFReport = dynamic(() => import("./PDFReport").then(mod => ({ default: mod.PDFReport })), { ssr: false });
 
 interface AnalysisReportProps {
   result: AnalysisResult;
@@ -79,6 +81,9 @@ CTA: ${heroRewrite.cta}`;
   const downloadPDF = async () => {
     setIsGeneratingPDF(true);
     try {
+      // Lazy-load de @react-pdf/renderer (solo cuando se descarga)
+      const { pdf } = await import("@react-pdf/renderer");
+      
       // Extraer dominio para el nombre del archivo
       const domain = pageContext.url.replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '');
       const date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD

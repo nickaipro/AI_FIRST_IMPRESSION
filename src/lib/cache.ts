@@ -16,12 +16,13 @@ if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) 
 
 const CACHE_TTL = 24 * 60 * 60; // 24 horas en segundos
 const CACHE_PREFIX = "ai-impression-cache:";
+const PROMPT_VERSION = "v3"; // Incrementar cuando cambie el prompt/scoring para invalidar caché viejo
 
 /**
  * Genera una key de caché basada en los parámetros de análisis
  */
 function generateCacheKey(url: string, targetAudience: string, pageGoal?: string): string {
-  const data = `${url}|${targetAudience}|${pageGoal || ""}`;
+  const data = `${PROMPT_VERSION}|${url}|${targetAudience}|${pageGoal || ""}`;
   const hash = crypto.createHash("sha256").update(data).digest("hex");
   return `${CACHE_PREFIX}${hash}`;
 }
