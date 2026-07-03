@@ -6,7 +6,11 @@ import type { AnalysisResult } from "@/types";
 import { getGradeTierColor } from "@/lib/rubric";
 
 // Lazy-load del componente PDF (solo se carga cuando el usuario descarga)
-const PDFReport = dynamic(() => import("./PDFReport").then(mod => ({ default: mod.PDFReport })), { ssr: false });
+// PDFReport es un named export, no default
+const PDFReport = dynamic(
+  () => import("./PDFReport").then(mod => mod.PDFReport),
+  { ssr: false }
+);
 
 interface AnalysisReportProps {
   result: AnalysisResult;
