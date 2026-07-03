@@ -55,15 +55,39 @@ export async function performAnalysis(
   // Validar contenido mínimo para evitar análisis con datos insuficientes
   const combinedContent = `${websiteData.title || ""} ${websiteData.mainContent || ""}`.trim();
   const contentLength = combinedContent.length;
+  const hasScreenshot = !!websiteData.screenshot;
   
   console.log(`📊 Content extracted - Length: ${contentLength} chars`);
   console.log(`📄 Content preview (first 200 chars): ${combinedContent.slice(0, 200)}...`);
+  console.log(`📸 Has screenshot: ${hasScreenshot}`);
 
-  if (contentLength < 300) {
+  // Detectar contenido-basura típico (cookie walls, JS walls)
+  const noisePatterns = [
+    /enable\s+javascript/i,
+    /javascript\s+(?:is\s+)?(?:required|disabled|not\s+enabled)/i,
+    /please\s+enable\s+cookies?/i,
+    /this\s+site\s+requires\s+cookies?/i,
+    /we\s+use\s+cookies\s+to\s+(?:ensure|provide)/i,
+  ];
+  
+  const isNoiseContent = noisePatterns.some(pattern => pattern.test(combinedContent));
+
+  if (isNoiseContent) {
+    console.log("⚠️ Detected noise content (JS/cookie wall)");
+    throw new Error(
+      "Esta web requiere JavaScript o cookies para mostrarse. No podemos analizarla en este momento. " +
+      "Intenta con una URL diferente."
+    );
+  }
+
+  // Guard de contenido: si hay screenshot válido, permitir análisis incluso con poco texto
+  if (contentLength < 300 && !hasScreenshot) {
     throw new Error(
       "No pudimos leer suficiente contenido de esta web. Puede estar bloqueando el acceso automatizado " +
       "o requerir JavaScript para cargar el contenido. Intenta con otra URL."
     );
+  } else if (contentLength < 300 && hasScreenshot) {
+    console.log("⚠️ Low text content but screenshot available - proceeding with visual analysis");
   }
 
   const hasOpenRouterKey = !!process.env.OPENROUTER_API_KEY;

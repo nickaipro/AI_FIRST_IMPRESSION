@@ -24,14 +24,9 @@ export async function analyzeWithAI(
   
   console.log(`🤖 Using model: ${modelToUse}${hasScreenshot ? ' (with vision)' : ' (text-only)'}`);
 
-
-  const systemPrompt = `Eres AI First Impression, un auditor experto en UX, copywriting, psicología cognitiva, CRO y claridad web.
-
-Tu trabajo es evaluar una página web desde la perspectiva del público objetivo indicado por el usuario.
-
-IMPORTANTE: No debes afirmar que realmente sientes como humano. Debes hacer una simulación razonada basada en evidencia visible, contenido extraído y buenas prácticas de UX/CRO.
-
-${hasScreenshot ? `
+  // Función auxiliar para construir systemPrompt dinámicamente
+  function buildSystemPrompt(useVision: boolean): string {
+    const visionBlock = useVision ? `
 🎨 ANÁLISIS VISUAL DISPONIBLE:
 Se te proporcionará un SCREENSHOT de la página web. Analiza TAMBIÉN:
 - Jerarquía visual real (tamaño, peso, posición de elementos)
@@ -48,7 +43,15 @@ Combina el análisis visual (screenshot) con el análisis textual (contenido) pa
 NO se proporcionó screenshot. Tu análisis está limitado al contenido textual extraído.
 NO evalúes aspectos visuales que no puedes ver (colores, tipografía, espaciado, layout).
 Enfócate en: claridad del mensaje, estructura del contenido, copy, jerarquía de información textual.
-`}
+`;
+
+    return `Eres AI First Impression, un auditor experto en UX, copywriting, psicología cognitiva, CRO y claridad web.
+
+Tu trabajo es evaluar una página web desde la perspectiva del público objetivo indicado por el usuario.
+
+IMPORTANTE: No debes afirmar que realmente sientes como humano. Debes hacer una simulación razonada basada en evidencia visible, contenido extraído y buenas prácticas de UX/CRO.
+
+${visionBlock}
 
 ⚠️ REGLA CRÍTICA ANTI-ALUCINACIÓN:
 Basa tu análisis ÚNICAMENTE en el CONTENIDO PROPORCIONADO abajo. NO uses conocimiento previo sobre la marca ni asumas NADA que no esté explícitamente en el contenido.
@@ -103,6 +106,10 @@ SEVERIDAD:
 - optional: Optimización avanzada, no problema
 
 RESPONDE ÚNICAMENTE CON JSON VÁLIDO. NO USES MARKDOWN. NO INCLUYAS RAZONAMIENTO PRIVADO.`;
+  }
+
+
+  const systemPrompt = buildSystemPrompt(hasScreenshot);
 
   const contentSummary = `
 URL: ${websiteData.url}
@@ -110,17 +117,17 @@ URL: ${websiteData.url}
 Título: ${websiteData.title || "No detectado"}
 Meta Description: ${websiteData.description || "No detectada"}
 
-Encabezados H1: ${websiteData.headings.h1.join(", ") || "Ninguno"}
-Encabezados H2: ${websiteData.headings.h2.slice(0, 5).join(", ") || "Ninguno"}
+Encabezados H1: ${websiteData.headings.h1.join(", ") || "No detectados"}
+Encabezados H2: ${websiteData.headings.h2.slice(0, 5).join(", ") || "No detectados"}
 
-Botones visibles: ${websiteData.visibleButtons.slice(0, 10).join(", ") || "Ninguno"}
-CTAs detectados: ${websiteData.callsToAction.join(", ") || "Ninguno"}
+${websiteData.visibleButtons.length > 0 ? `Botones visibles: ${websiteData.visibleButtons.slice(0, 10).join(", ")}` : "Botones visibles: No extraídos estructuralmente — evalúa este elemento a partir del contenido y, sobre todo, del screenshot."}
+${websiteData.callsToAction.length > 0 ? `CTAs detectados: ${websiteData.callsToAction.join(", ")}` : "CTAs detectados: No extraídos estructuralmente — evalúa este elemento a partir del contenido y, sobre todo, del screenshot."}
 
-Contenido principal (resumen):
-${websiteData.mainContent.slice(0, 2500)}
+Contenido principal (primeros 10,000 caracteres):
+${websiteData.mainContent.slice(0, 10000)}
 
-Señales de confianza: ${websiteData.trustSignals.join(", ") || "Ninguna"}
-Info de contacto: ${websiteData.contactInfo.join(", ") || "Ninguna"}
+${websiteData.trustSignals.length > 0 ? `Señales de confianza: ${websiteData.trustSignals.join(", ")}` : "Señales de confianza: No extraídas estructuralmente — evalúa este elemento a partir del contenido y screenshot."}
+${websiteData.contactInfo.length > 0 ? `Info de contacto: ${websiteData.contactInfo.join(", ")}` : "Info de contacto: No extraída estructuralmente — evalúa este elemento a partir del contenido y screenshot."}
 `.trim();
 
   const userPrompt = `Público objetivo: ${targetAudience}
@@ -214,7 +221,7 @@ Devuelve el análisis en este formato JSON exacto:
   ]
 }`;
 
-  async function callOpenRouter(model: string): Promise<AnalysisResult> {
+  async function callOpenRouter(model: string, useVision: boolean = false): Promise<AnalysisResult> {
     // Obtener el referer correcto (Vercel URL en producción, localhost en desarrollo)
     const referer = process.env.VERCEL_URL 
       ? `https://${process.env.VERCEL_URL}` 
@@ -224,12 +231,15 @@ Devuelve el análisis en este formato JSON exacto:
     
     console.log("Calling OpenRouter with model:", model);
     console.log("HTTP-Referer:", referer);
-    console.log("Has screenshot:", hasScreenshot);
+    console.log("Use vision:", useVision);
 
-    // Construir el mensaje del usuario según si hay screenshot o no
+    // Construir systemPrompt específico para esta llamada
+    const systemPromptForCall = buildSystemPrompt(useVision);
+
+    // Construir el mensaje del usuario según si se usa visión
     let userMessage: any;
     
-    if (hasScreenshot && websiteData.screenshot) {
+    if (useVision && websiteData.screenshot) {
       // Mensaje multimodal con imagen
       userMessage = {
         role: "user",
@@ -265,7 +275,7 @@ Devuelve el análisis en este formato JSON exacto:
       body: JSON.stringify({
         model: model,
         messages: [
-          { role: "system", content: systemPrompt },
+          { role: "system", content: systemPromptForCall },
           userMessage,
         ],
         temperature: 0.3,
@@ -292,7 +302,7 @@ Devuelve el análisis en este formato JSON exacto:
       console.log("✅ Successfully parsed AI response");
       
       // Validar y calibrar la respuesta
-      const validated = validateAndCalibrateResponse(result, websiteData, hasScreenshot);
+      const validated = validateAndCalibrateResponse(result, websiteData, useVision);
       return validated;
     } catch (parseError) {
       console.error("❌ Failed to parse AI response:", content.substring(0, 200));
@@ -302,7 +312,7 @@ Devuelve el análisis en este formato JSON exacto:
 
   try {
     console.log(`Attempting analysis with model: ${modelToUse}`);
-    return await callOpenRouter(modelToUse);
+    return await callOpenRouter(modelToUse, hasScreenshot);
   } catch (primaryError) {
     console.error(`Primary model (${modelToUse}) failed:`, primaryError);
     
@@ -310,7 +320,7 @@ Devuelve el análisis en este formato JSON exacto:
     if (hasScreenshot && modelToUse !== primaryModel) {
       console.log(`🔄 Vision model failed, falling back to text-only model: ${primaryModel}`);
       try {
-        return await callOpenRouter(primaryModel);
+        return await callOpenRouter(primaryModel, false);
       } catch (fallbackError) {
         console.error(`Text-only fallback also failed:`, fallbackError);
       }
@@ -324,7 +334,7 @@ Devuelve el análisis en este formato JSON exacto:
 
     try {
       console.log(`Attempting analysis with fallback model: ${FALLBACK_MODEL}`);
-      return await callOpenRouter(FALLBACK_MODEL);
+      return await callOpenRouter(FALLBACK_MODEL, false);
     } catch (fallbackError) {
       console.error(`Fallback model (${FALLBACK_MODEL}) also failed:`, fallbackError);
       throw new Error(
@@ -339,8 +349,33 @@ function validateAndCalibrateResponse(rawResult: any, websiteData: WebsiteData, 
   let dimensionScores = validateDimensionScores(rawResult.dimensionScores || {});
   
   // Detectar características de la página
-  const hasCTA = websiteData.callsToAction.length > 0 || websiteData.visibleButtons.length > 0;
-  const hasContact = websiteData.contactInfo.length > 0;
+  // Si hay arrays poblados, úsalos. Si hay análisis visual, también considera los findings del modelo
+  let hasCTA = websiteData.callsToAction.length > 0 || websiteData.visibleButtons.length > 0;
+  let hasContact = websiteData.contactInfo.length > 0;
+  
+  // Si se usó análisis visual y los arrays de texto están vacíos, derivar de los findings del modelo
+  if (visualAnalysisUsed) {
+    const allFindings = [
+      ...(rawResult.dimensionScores?.clarityOfMessage?.findings || []),
+      ...(rawResult.dimensionScores?.conversionOptimization?.findings || []),
+      ...(rawResult.dimensionScores?.userExperience?.findings || []),
+    ].map((f: any) => (f.title + ' ' + f.description).toLowerCase());
+    
+    // Buscar menciones de CTAs o botones en los findings del modelo
+    if (!hasCTA) {
+      hasCTA = allFindings.some((text: string) => 
+        /\b(?:cta|call.to.action|button|sign.?up|get.?started|buy|shop|contact.?us|request|demo|try.?free)\b/.test(text)
+      );
+    }
+    
+    // Buscar menciones de info de contacto en los findings del modelo
+    if (!hasContact) {
+      hasContact = allFindings.some((text: string) => 
+        /\b(?:contact|email|phone|address|form|support|tel:|mailto:)\b/.test(text)
+      );
+    }
+  }
+  
   const isClear = websiteData.title.length > 0 && websiteData.headings.h1.length > 0;
   
   // Ajustar scores poco realistas
