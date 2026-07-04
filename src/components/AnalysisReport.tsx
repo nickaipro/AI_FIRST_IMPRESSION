@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { track } from "@vercel/analytics";
 import type { AnalysisResult } from "@/types";
 import { getGradeTierColor } from "@/lib/rubric";
+import FeedbackSection from "./FeedbackSection";
 
 // Lazy-load del componente PDF (solo se carga cuando el usuario descarga)
 // PDFReport es un named export, no default
@@ -360,6 +361,21 @@ CTA: ${heroRewrite.cta}`;
           </ul>
         </div>
       )}
+
+      {/* Sección de feedback */}
+      <FeedbackSection
+        analyzedDomain={(() => {
+          try {
+            const parsedUrl = new URL(pageContext.url);
+            return parsedUrl.hostname.replace(/^www\./, "");
+          } catch {
+            return "unknown";
+          }
+        })()}
+        score={evaluationSummary.totalScore}
+        pageType={pageContext.detectedPageType}
+        targetAudience={pageContext.targetAudience}
+      />
 
       {/* Botones de acción */}
       <div className="flex gap-4">
