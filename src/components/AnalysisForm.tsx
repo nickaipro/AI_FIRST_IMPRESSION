@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { track } from "@vercel/analytics";
 import type { AnalysisResult } from "@/types";
 
 interface AnalysisFormProps {
@@ -44,6 +45,22 @@ export default function AnalysisForm({ onAnalysisComplete }: AnalysisFormProps) 
     setError("");
     setLoading(true);
 
+    // Extraer hostname para analytics (privacidad)
+    let hostname = "unknown";
+    try {
+      const parsedUrl = new URL(url);
+      hostname = parsedUrl.hostname.replace(/^www\./, "");
+    } catch {
+      // Si falla el parseo, mantener "unknown"
+    }
+
+    // Track: análisis iniciado
+    const startTimestamp = Date.now();
+    track("analysis_started", {
+      hasGoal: Boolean(pageGoal),
+      hostname,
+    });
+
     try {
       const response = await fetch("/api/analyze", {
         method: "POST",
@@ -61,27 +78,67 @@ export default function AnalysisForm({ onAnalysisComplete }: AnalysisFormProps) 
       if (!response.ok) {
         // Intentar leer el mensaje de error del servidor
         let errorMessage = "No pudimos analizar tu web ahora mismo. Intenta de nuevo en un momento.";
+        let reason = "server_error";
+        
         try {
           const errorData = await response.json();
           if (errorData.error) {
             errorMessage = errorData.error;
+            // Derivar un reason no sensible del status
+            if (response.status === 429) {
+              reason = "rate_limited";
+            } else if (response.status >= 500) {
+              reason = "server_error";
+            } else if (response.status === 400) {
+              reason = "validation_error";
+            }
           }
         } catch {
           // Si no se puede parsear el JSON, usar el mensaje por defecto
           errorMessage = `Error del servidor (${response.status}): ${response.statusText}`;
+          if (response.status === 429) reason = "rate_limited";
+          else if (response.status >= 500) reason = "server_error";
+          else if (response.status === 408) reason = "timeout";
         }
+        
+        // Track: análisis fallido
+        track("analysis_failed", { reason, hostname });
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
 
       if (!data.success) {
+        // Track: análisis fallido
+        track("analysis_failed", { 
+          reason: "extraction_failed",
+          hostname,
+        });
         throw new Error(data.error || "El análisis falló");
       }
+
+      // Track: análisis completado exitosamente
+      const durationMs = Date.now() - startTimestamp;
+      track("analysis_completed", {
+        score: data.data.evaluationSummary?.totalScore ?? 0,
+        pageType: data.data.pageContext?.detectedPageType ?? "unknown",
+        durationMs,
+        visualAnalysisUsed: data.data.visualAnalysisUsed ?? false,
+        hostname,
+      });
 
       onAnalysisComplete(data.data);
     } catch (err) {
       console.error("Error durante el análisis:", err);
+      
+      // Si no hemos tracked el error aún, hacerlo aquí
+      if (err instanceof Error && !err.message.includes("servidor")) {
+        track("analysis_failed", { 
+          reason: "network_error",
+          hostname,
+        });
+      }
+      
       setError(
         err instanceof Error 
           ? err.message 

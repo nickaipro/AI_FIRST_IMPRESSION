@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
+import { track } from "@vercel/analytics";
 import type { AnalysisResult } from "@/types";
 import { getGradeTierColor } from "@/lib/rubric";
 
@@ -79,6 +80,12 @@ Subtítulo: ${heroRewrite.subheadline}
 CTA: ${heroRewrite.cta}`;
 
     navigator.clipboard.writeText(text);
+    
+    // Track: informe copiado
+    track("report_copied", {
+      score: evaluationSummary.totalScore,
+    });
+    
     alert("¡Informe copiado al portapapeles!");
   };
 
@@ -116,6 +123,11 @@ CTA: ${heroRewrite.cta}`;
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
+      
+      // Track: PDF descargado exitosamente
+      track("pdf_downloaded", {
+        score: evaluationSummary.totalScore,
+      });
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('No se pudo generar el PDF. Por favor, intenta de nuevo.');

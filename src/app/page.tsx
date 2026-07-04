@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { track } from "@vercel/analytics";
 import AnalysisForm from "@/components/AnalysisForm";
 import AnalysisReport from "@/components/AnalysisReport";
 import type { AnalysisResult } from "@/types";
@@ -9,6 +10,8 @@ export default function Home() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
 
   const handleReset = () => {
+    // Track: usuario quiere analizar otro sitio
+    track("analyze_another");
     setAnalysisResult(null);
   };
 
